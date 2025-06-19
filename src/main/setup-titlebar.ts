@@ -6,16 +6,18 @@
 export default () => {
 	if (process.type !== 'browser') return
 
-	const { BrowserWindow, Menu, MenuItem, ipcMain } = require('electron')
-
+	const { BrowserWindow, Menu, MenuItem, ipcMain, getCurrentWindow } = require('electron')
 	// Send menu to renderer title bar process
-	ipcMain.handle('request-application-menu', async () => JSON.parse(JSON.stringify(
-		Menu.getApplicationMenu(),
-		(key: string, value: any) => (key !== 'commandsMap' && key !== 'menu') ? value : undefined)
-	))
+	ipcMain.handle('request-application-menu', async () => {
+		const currentWindow = getCurrentWindow()
+		return JSON.parse(JSON.stringify(
+			currentWindow.menu,
+			(key: string, value: any) => (key !== 'commandsMap' && key !== 'menu') ? value : undefined
+		))
+	})
 
 	// Handle window events
-	ipcMain.on('window-event', (event, eventName: String) => {
+	ipcMain.on('window-event', (event: any, eventName: String) => {
 		const window = BrowserWindow.fromWebContents(event.sender)
 
 		/* eslint-disable indent */
@@ -40,13 +42,14 @@ export default () => {
 	})
 
 	// Handle menu events
-	ipcMain.on('menu-event', (event, commandId: Number) => {
-		const item = getMenuItemByCommandId(commandId, Menu.getApplicationMenu())
-		if (item) item.click(undefined, BrowserWindow.fromWebContents(event.sender), event.sender)
+	ipcMain.on('menu-event', (event: any, commandId: Number) => {
+		const window = BrowserWindow.fromWebContents(event.sender)
+		const item = getMenuItemByCommandId(commandId, window.menu)
+		if (item) item.click(undefined, window, event.sender)
 	})
 
 	// Handle the minimum size.
-	ipcMain.on('window-set-minimumSize', (event, width, height) => {
+	ipcMain.on('window-set-minimumSize', (event: any, width: number, height: number) => {
 	    const window = BrowserWindow.fromWebContents(event.sender);
 		
 	    /* eslint-disable indent */
@@ -56,8 +59,9 @@ export default () => {
 	});
 
 	// Handle menu item icon
-	ipcMain.on('menu-icon', (event, commandId: Number) => {
-		const item = getMenuItemByCommandId(commandId, Menu.getApplicationMenu())
+	ipcMain.on('menu-icon', (event: any, commandId: Number) => {
+		const window = getCurrentWindow()
+		const item = getMenuItemByCommandId(commandId, window.menu)
 		if (item && item.icon && typeof item.icon !== 'string') {
 			event.returnValue = item.icon.toDataURL()
 		} else {
@@ -65,7 +69,7 @@ export default () => {
 		}
 	})
 
-	ipcMain.on('update-window-controls', (event, args: Electron.TitleBarOverlay) => {
+	ipcMain.on('update-window-controls', (event: any, args: Electron.TitleBarOverlay) => {
 		const window = BrowserWindow.fromWebContents(event.sender)
 		try {
 			if (window) window.setTitleBarOverlay(args)
